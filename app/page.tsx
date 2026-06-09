@@ -826,7 +826,7 @@ overflow: "hidden",
 backgroundSize: "cover",
 backgroundPosition: "center",
         color: "white",
-        display: "flex",
+        
         flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
