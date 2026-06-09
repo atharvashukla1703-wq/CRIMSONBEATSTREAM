@@ -132,9 +132,9 @@ img{
 
 @media (max-width:1000px){
 
-  .app-layout{
-    flex-direction:column !important;
-  }
+  .main-layout{
+  flex-direction:column !important;
+}
 
   .left-sidebar{
     display:none !important;

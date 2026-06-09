@@ -1,5 +1,9 @@
 "use client";
 import {
+  query,
+  where,
+} from "firebase/firestore";
+import {
   doc,
   setDoc,
   getDoc,
@@ -81,34 +85,47 @@ export default function Home() {
   useEffect(() => {
   const loadUploadedSongs =
     async () => {
-      const snapshot =
-        await getDocs(
-          collection(db, "songs")
-        );
+      if (!auth.currentUser) return;
 
-      const songsFromDb =
-        snapshot.docs.map(
-          (doc) =>
-            ({
-  id: doc.id,
-  title:
-    doc.data().title,
-  artist:
-    doc.data().artist,
-  audio:
-    doc.data().songUrl,
-  cover:
-    doc.data().coverUrl,
-  streams:
-    doc.data().streams || 0,
-  color:
-    "#ff003c",
-}) as Song
-        );
+const songsQuery = query(
+  collection(db, "songs"),
+  where(
+    "artistId",
+    "==",
+    auth.currentUser.uid
+  )
+);
+
+const snapshot =
+  await getDocs(
+    songsQuery
+  );
+
+      
+  const songsFromDb =
+  snapshot.docs.map(
+    (doc) =>
+      ({
+        id: doc.id,
+        title: doc.data().title,
+        artist: doc.data().artist,
+        artistId:
+          doc.data().artistId,
+        audio: doc.data().songUrl,
+        cover: doc.data().coverUrl,
+        streams:
+          doc.data().streams || 0,
+        color: "#ff003c",
+      }) as any
+  );
 
       setUploadedSongs(
         songsFromDb
       );
+      console.log(
+  "UPLOADED SONGS:",
+  songsFromDb
+);
       if (
   songsFromDb.length > 0
 ) {
@@ -156,14 +173,12 @@ setTotalFollowers(
   loadUploadedSongs();
 }, []);
 
-  const [currentSong, setCurrentSong] = useState<Song>(
-    safeSongs[0] || {
-      title: "No Song",
-      audio: "",
-      cover: "",
-      color: "#000",
-    }
-  );
+  const [currentSong, setCurrentSong] = useState<Song>({
+  title: "",
+  audio: "",
+  cover: "",
+  color: "#000",
+});
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -342,6 +357,8 @@ const coverData =
   {
     title: songTitle,
     artist: artistName,
+    artistId:
+      auth.currentUser?.uid,
     songUrl:
       songData.secure_url,
     coverUrl:
@@ -453,16 +470,8 @@ useEffect(() => {
 
     return () => clearInterval(interval);
   }, [isPlaying]);
-  useEffect(() => {
-  if (
-    safeSongs.length > 0 &&
-    !currentSong.audio
-  ) {
-    setCurrentSong(
-      safeSongs[0]
-    );
-  }
-}, [safeSongs]);
+  
+  
 
   // AUDIO ENGINE
   useEffect(() => {
@@ -527,7 +536,8 @@ useEffect(() => {
         setCurrentTime(0);
 
         if (isPlaying) {
-          await audio.play();
+          
+          audio.play().catch(() => {});
         }
       } catch (err) {
         console.log("Audio error:", err);
@@ -560,6 +570,8 @@ useEffect(() => {
     }
   };
 
+  
+  
   const playSong = async (
   song: Song
 ) => {
@@ -798,12 +810,14 @@ const followArtist = async (
     const s = Math.floor(t % 60);
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
-  if (cinematicMode) {
+   
+  if (false && cinematicMode) {
   return (
     <div
       style={{
         width: "100vw",
         height: "100vh",
+        display: cinematicMode ? "flex" : "none",
         position: "relative",
 overflow: "hidden",
         
@@ -835,12 +849,9 @@ rgba(0,0,0,.85)
     zIndex: 1,
   }}
 />
-console.log(
-  "COVER URL:",
-  currentSong.cover
-);
+
       <img
-        src={currentSong.cover}
+        src={currentSong.cover || "/logo.png"}
         alt={currentSong.title}
         style={{
           width: 520,
@@ -926,16 +937,28 @@ console.log(
         }}
       >
         Exit Cinematic Mode
+        <p
+  style={{
+    color: "yellow",
+    zIndex: 2,
+    marginTop: 20,
+  }}
+>
+  Audio Exists:
+  {audioRef.current ? " YES" : " NO"}
+</p>
       </button>
     </div>
   );
 }
+
   return (
     <>
       <main
-        style={{
-          display: "flex",
-          minHeight: "100vh",
+  className="main-layout"
+  style={{
+    display: "flex",
+    minHeight: "100vh",
           
           color: "white",
           overflowX: "hidden",
@@ -1095,7 +1118,8 @@ BEATSTREAM
   }}
 >
   <img
-    src={currentSong.cover}
+    
+    src={currentSong.cover || "/logo.png"}
     style={{
       position: "absolute",
       right: 0,
@@ -2383,6 +2407,7 @@ fontWeight: 800,
 </div>
 
        {/* RIGHT PLAYER */}
+       {currentSong.audio && (
 <div
   className="desktop-player"
   style={{
@@ -2399,7 +2424,8 @@ minWidth: "260px",
   }}
 >
   <img
-    src={currentSong.cover}
+    
+    src={currentSong.cover || "/logo.png"}
     className="player-cover"
     style={{
       width: "100%",
@@ -2627,7 +2653,67 @@ boxShadow:
     ))}
   </div>
 </div>
+)}
+{cinematicMode && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 9999,
+      backgroundImage: `url(${currentSong.cover})`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+    }}
+  >
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        backdropFilter: "blur(30px)",
+        background:
+          "rgba(0,0,0,0.7)",
+      }}
+    />
 
+    <img
+      src={currentSong.cover}
+      alt={currentSong.title}
+      style={{
+        width: 400,
+        height: 400,
+        objectFit: "cover",
+        borderRadius: 24,
+        zIndex: 2,
+      }}
+    />
+
+    <h1
+      style={{
+        zIndex: 2,
+        marginTop: 20,
+      }}
+    >
+      {currentSong.title}
+    </h1>
+
+    <button
+      onClick={() =>
+        setCinematicMode(false)
+      }
+      style={{
+        zIndex: 2,
+        marginTop: 20,
+        padding: "12px 24px",
+      }}
+    >
+      Exit Cinematic Mode
+    </button>
+  </div>
+)}
 <audio ref={audioRef} />
 <style jsx>{`
   @keyframes floatCover {
